@@ -1,4 +1,5 @@
 
+/// Confirmation Dialog data struct. Persists the data needed to delete task(s) across UI update cycles.
 pub struct ConfirmationDialog {
 	tasks_to_delete: String,
 	show: bool,
@@ -6,8 +7,7 @@ pub struct ConfirmationDialog {
 }
 
 impl ConfirmationDialog {
-	pub fn new() -> ConfirmationDialog
-	{
+	pub fn new() -> ConfirmationDialog {
 		ConfirmationDialog {
 			tasks_to_delete: String::new(),
 			show: false,
@@ -21,7 +21,7 @@ impl ConfirmationDialog {
 
 	pub fn text(&self) -> String {
 		let binding = self.tasks_to_delete();
-  		let mut tasks = binding.split(' ').collect::<Vec<&str>>();
+		let mut tasks = binding.split(' ').collect::<Vec<&str>>();
 
 		let ttd = if tasks.len() > 1 {
 			let last_task = tasks.pop().unwrap();

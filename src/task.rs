@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use chrono::{Days, Local, NaiveDateTime};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::fmt::Display;
 
 pub struct Task {
@@ -26,7 +26,9 @@ impl Task {
 	pub(crate) fn due_in_days(&self) -> Option<i32> {
 		let now = Local::now().date_naive();
 
-		let Some(due) = self.due_date else { return None };
+		let Some(due) = self.due_date else {
+			return None;
+		};
 
 		Some(due.date().to_epoch_days() - now.to_epoch_days())
 	}
@@ -125,7 +127,11 @@ impl Display for Task {
 	fn fmt(&self, fmt: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
 		let due = if let Some(due_in_days) = self.due_in_days() {
 			if due_in_days > 0 {
-				format!("due in {} days ({})", due_in_days, self.due_date.unwrap().format("%m-%d-%Y"))
+				format!(
+					"due in {} days ({})",
+					due_in_days,
+					self.due_date.unwrap().format("%m-%d-%Y")
+				)
 			} else if due_in_days == 0 {
 				String::from("Due Today")
 			} else {

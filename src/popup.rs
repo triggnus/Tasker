@@ -9,6 +9,7 @@ use ratatui::{
 	widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
 };
 
+/// Popup for the Ratatui TUI system.
 #[derive(Debug, Default, Setters)]
 pub struct Popup<'a> {
 	#[setters(into)]
@@ -25,18 +26,23 @@ pub struct Popup<'a> {
 impl Widget for Popup<'_> {
 	fn render(self, area: Rect, buf: &mut Buffer) {
 		// ensure that all cells under the popup are cleared to avoid leaking content
-		//let text: Text<'_> = format!("\n{}", self.content).into();
 		Clear.render(area, buf);
+
 		let block = Block::new()
 			.title(self.title)
 			.title_style(self.title_style)
 			.borders(Borders::ALL)
 			.border_style(self.border_style);
+
 		Paragraph::new(self.content)
 			.wrap(Wrap { trim: true })
 			.style(self.style)
 			.block(block)
-			.alignment(if self.centered { Alignment::Center } else { Alignment::Left })
+			.alignment(if self.centered {
+				Alignment::Center
+			} else {
+				Alignment::Left
+			})
 			.render(area, buf);
 	}
 }

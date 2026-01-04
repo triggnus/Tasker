@@ -1,21 +1,21 @@
 use crate::confirmation::ConfirmationDialog;
-use crate::popup::{centered_rect, Popup};
+use crate::popup::{Popup, centered_rect};
 use crate::task::Task;
 use crossterm::{
 	event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
 	execute,
-	terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use ratatui::layout::Position;
 use ratatui::style::{Color, Style};
 use ratatui::{
+	Terminal,
 	backend::CrosstermBackend,
 	layout::{Constraint, Direction, Layout},
 	widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
-	Terminal,
 };
 use rusqlite::Connection;
 use std::io;
-use ratatui::layout::{Offset, Position};
 
 mod confirmation;
 mod popup;
@@ -23,26 +23,10 @@ mod task;
 
 //noinspection DuplicatedCode
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let conn = Connection::open("db.sqlite").expect("Could not open db.sqlite");
+	// --- DB Initialization ---
+	let conn = Connection::open("task_db.sqlite")?;
 
-	let mut stmt = conn
-		.prepare("SELECT id, description, due_date FROM tasks ORDER BY id ASC")
-		.expect("Could not prepare query");
-
-	let mut tasks = stmt
-		.query_map([], |row| {
-			let task = Task::new(
-				row.get("id").expect("Could not get id"),
-				row.get("description").expect("Could not get description"),
-				row.get("due_date").expect("Could not get due_date"),
-			);
-
-			Ok(task)
-		})
-		.expect("Could not load task(s)")
-		.map(|task| task.unwrap())
-		.collect::<Vec<Task>>();
-
+	// If the db does not exist, create it.
 	conn.execute(
 		"CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY,
@@ -50,25 +34,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			due_date DATE NULL
 		)",
 		(),
-	)
-	.expect("Could not create table");
+	)?;
 
-	// --- TERMINAL SETUP ---
+	// Load the database in to a Vec<Task>
+	let mut tasks = conn
+		.prepare("SELECT id, description, due_date FROM tasks ORDER BY id ASC")?
+		.query_map([], |row| {
+			Ok(Task::new(
+				row.get("id")?,
+				row.get("description")?,
+				row.get("due_date")?,
+			))
+		})?
+		.map(|task| task.unwrap())
+		.collect::<Vec<Task>>();
+
+	// --- Terminal Setup ---
 	enable_raw_mode()?;
 	let mut stdout = io::stdout();
 	execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 	let backend = CrosstermBackend::new(stdout);
 	let mut terminal = Terminal::new(backend)?;
 
-	// --- APPLICATION STATE ---
+	// --- Application State ---
 	let mut input = String::new();
 	let mut show_task_popup = false;
 	let mut command = String::new();
 	let mut task_popup_command = String::new();
 	let mut confirm_dialog = ConfirmationDialog::new();
 
+	// --- UI Main Loop ---
 	loop {
-		// --- UI DRAWING ---
 		terminal.draw(|f| {
 			let size = f.area();
 			let chunks = Layout::default()
@@ -80,7 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				])
 				.split(f.area());
 
-			// 1. Render Input Box
+			// Render Input Box
 			let input_widget = Paragraph::new(input.as_str()).block(
 				Block::default()
 					.borders(Borders::ALL)
@@ -88,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			);
 			f.render_widget(input_widget, chunks[0]);
 
-			// 2. Render List
+			// Render List
 			let list_items: Vec<ListItem> = tasks
 				.iter()
 				.map(|task| ListItem::new(task.to_string()))
@@ -102,14 +98,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			);
 			f.render_widget(list_widget, chunks[1]);
 
+			// --- Task Popup Dialog ---
 			if show_task_popup {
 				let area = centered_rect(40, 20, size); // Dialog size: 60% width, 20% height
 				f.render_widget(Clear, area); // This clears the background under the popup
 
+				// internally, the command is all lowercase. This code capitalizes the first letter.
+				// Rust has no convenient methods for this, for some reason.
 				let title = format!(
 					"{}{} Task",
-					command.chars().next().unwrap().to_uppercase(),
-					command.chars().skip(1).collect::<String>()
+					&command[..1].to_string().to_uppercase(),
+					&command[1..]
 				);
 
 				let command_color = if command == "add" {
@@ -121,11 +120,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				let popup = Popup::default()
 					.style(Style::new().yellow())
 					.title(title)
-					//.centered(true)
 					.content(task_popup_command.as_str())
 					.title_style(Style::new().white().bold())
 					.border_style(Style::new().fg(command_color));
 
+				// Calculate the position of the cursor
 				let mut cur_pos = area.as_position();
 				cur_pos.x = cur_pos.x + task_popup_command.len() as u16 + 1;
 				cur_pos.y += 1;
@@ -135,6 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				f.render_widget(popup, area);
 			}
 
+			// --- Confirmation Dialog ---
 			if confirm_dialog.is_shown() {
 				let area = centered_rect(40, 20, size);
 				f.render_widget(Clear, area);
@@ -150,9 +150,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				f.render_widget(popup, area);
 			}
 
+			// Draw the cursor in the right place
 			if !show_task_popup && !confirm_dialog.is_shown() {
 				f.set_cursor_position(Position::new(
+					// chunks[0] is the left most side of the input box
+					// Add the length of the input string + 1
 					chunks[0].x + input.len() as u16 + 1,
+					// Drop the row by 1
 					chunks[0].y + 1,
 				));
 			}
@@ -172,6 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				}
 				KeyCode::Enter => {
 					if !input.is_empty() {
+						// NOTE: This is a bit convoluted, but it works. Need to rethink this.
 						match input.to_lowercase().as_str() {
 							"add" | "delete" => {
 								show_task_popup = true;
@@ -189,27 +194,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 								confirm_dialog.show();
 							}
 							"exit" | "quit" => break,
-							_ => {}
-						}
+							_ => {
+								// --- Inline command support ---
+								if input.starts_with("d") {
+									if let Some(sub_commands) = input.split_once(" ") {
+										let tasks_to_delete = sub_commands.1.to_string();
 
-						if input.starts_with("d") {
-							if let Some(sub_commands) = input.split_once(" ") {
-								let tasks_to_delete = sub_commands.1.to_string();
+										confirm_dialog.set_tasks_to_delete(tasks_to_delete.clone());
+										confirm_dialog.show();
+									}
+								}
 
-								confirm_dialog.set_tasks_to_delete(tasks_to_delete.clone());
-								confirm_dialog.show();
-							}
-						}
-
-						if input.starts_with("a") {
-							if let Some(sub_commands) = input.split_once(" ") {
-								tasks.push(Task::insert_task(&conn, sub_commands.1.to_string())?);
+								if input.starts_with("a") {
+									if let Some(sub_commands) = input.split_once(" ") {
+										tasks.push(Task::insert_task(
+											&conn,
+											sub_commands.1.to_string(),
+										)?);
+									}
+								}
 							}
 						}
 
 						input.clear();
 					}
 
+					// if the add/delete task popup is shown and the command entered isn't empty
 					if show_task_popup && !task_popup_command.is_empty() {
 						if command == "add" || command == "a" {
 							let new_task = Task::insert_task(&conn, task_popup_command.clone())?;
@@ -219,7 +229,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						{
 							confirm_dialog.set_tasks_to_delete(task_popup_command.clone());
 							confirm_dialog.show();
-							//Task::remove_tasks(&conn, &mut tasks, task_popup_command.clone())?;
 						}
 
 						task_popup_command.clear();
@@ -227,24 +236,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					}
 				}
 				KeyCode::Char(c) => {
+					// c is every non-command character typed while the program is running.
+
+					// if the popup is rendered, then pipe the output to task_popup_command instead of input.
 					if show_task_popup {
 						task_popup_command.push(c);
-					} else if confirm_dialog.is_shown() {
+					}
+					// else if the confirmation dialog is rendered, capture the 'y' char if pressed to confirm task deletion
+					else if confirm_dialog.is_shown() {
 						if c == 'y' {
-							Task::remove_tasks(&conn, &mut tasks, confirm_dialog.tasks_to_delete()).expect("Could not remove tasks");
+							Task::remove_tasks(&conn, &mut tasks, confirm_dialog.tasks_to_delete())
+								.expect("Could not remove tasks");
 						}
 						confirm_dialog.reset();
-					} else {
+					}
+					// Base case. Pipe input to the input variable.
+					else {
 						input.push(c);
 					}
 				}
 				KeyCode::Backspace => {
+					// if the popup is rendered, backspace should operate on task_popup_command
 					if show_task_popup {
 						task_popup_command.pop();
-					} else {
+					}
+					// Base case. Backspace removes the last char of the input string.
+					else {
 						input.pop();
 					}
 				}
+				// No support for any other class of key presses (function keys, arrows, tab, etc.)
 				_ => {}
 			}
 		}
