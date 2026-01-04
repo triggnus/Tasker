@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use chrono::{Days, Local, NaiveDateTime};
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use std::fmt::Display;
 
 pub struct Task {
@@ -21,6 +21,14 @@ impl Task {
 
 	pub(crate) fn id(&self) -> u32 {
 		self.id
+	}
+
+	pub(crate) fn due_in_days(&self) -> Option<i32> {
+		let now = Local::now().date_naive();
+
+		let Some(due) = self.due_date else { return None };
+
+		Some(due.date().to_epoch_days() - now.to_epoch_days())
 	}
 
 	pub(crate) fn db_insert_task(
@@ -115,12 +123,18 @@ impl Task {
 
 impl Display for Task {
 	fn fmt(&self, fmt: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-		let due = if let Some(due_date) = self.due_date {
-			format!(" due {}", due_date.format("%m-%d-%Y").to_string())
+		let due = if let Some(due_in_days) = self.due_in_days() {
+			if due_in_days > 0 {
+				format!("due in {} days ({})", due_in_days, self.due_date.unwrap().format("%m-%d-%Y"))
+			} else if due_in_days == 0 {
+				String::from("Due Today")
+			} else {
+				format!("PAST DUE ({} days)", -due_in_days)
+			}
 		} else {
 			String::new()
 		};
 
-		write!(fmt, "[{}] {}{}", self.id, self.description, due)
+		write!(fmt, "[{}] '{}' {}", self.id, self.description, due)
 	}
 }
