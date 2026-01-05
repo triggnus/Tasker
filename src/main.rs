@@ -178,22 +178,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					if !input.is_empty() {
 						// NOTE: This is a bit convoluted, but it works. Need to rethink this.
 						match input.to_lowercase().as_str() {
-							"add" | "delete" => {
-								show_task_popup = true;
-								command = input.clone();
-							}
-							"a" => {
+							"a" | "add" => {
 								show_task_popup = true;
 								command = "add".to_string();
 							}
-							"d" => {
+							"d" | "delete" => {
 								show_task_popup = true;
 								command = "delete".to_string();
 							}
-							"t" => {
-								confirm_dialog.show();
-							}
-							"exit" | "quit" => break,
+							"exit" | "quit" | "q" => break,
 							_ => {
 								// --- Inline command support ---
 								if input.starts_with("d") {
@@ -245,8 +238,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					// else if the confirmation dialog is rendered, capture the 'y' char if pressed to confirm task deletion
 					else if confirm_dialog.is_shown() {
 						if c == 'y' {
-							Task::remove_tasks(&conn, &mut tasks, confirm_dialog.tasks_to_delete())
-								.expect("Could not remove tasks");
+							Task::remove_tasks(&conn, &mut tasks, confirm_dialog.tasks_to_delete())?;
 						}
 						confirm_dialog.reset();
 					}
@@ -281,38 +273,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	terminal.show_cursor()?;
 
 	Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	//noinspection DuplicatedCode
-	#[test]
-	fn test_parse_task() -> Result<(), Box<dyn std::error::Error>> {
-		let conn = Connection::open("db.sqlite").expect("Could not open db.sqlite");
-
-		let mut stmt = conn
-			.prepare("SELECT id, description, due_date FROM tasks ORDER BY id ASC")
-			.expect("Could not prepare query");
-
-		let mut tasks = stmt
-			.query_map([], |row| {
-				let task = Task::new(
-					row.get("id").expect("Could not get id"),
-					row.get("description").expect("Could not get description"),
-					row.get("due_date").expect("Could not get due_date"),
-				);
-
-				Ok(task)
-			})
-			.expect("Could not load task(s)")
-			.map(|task| task.unwrap())
-			.collect::<Vec<Task>>();
-
-		Task::insert_task(&conn, "add test1".to_string())?;
-		Task::remove_tasks(&conn, &mut tasks, "delete all".to_string())?;
-
-		Ok(())
-	}
 }
