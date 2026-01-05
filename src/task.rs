@@ -49,17 +49,16 @@ impl Task {
 		conn.execute(
 			"INSERT INTO tasks (description, due_date) VALUES (?1, ?2)",
 			params![description, due_date],
-		)
-		.expect("Could not insert task");
+		)?;
 
 		let mut stmt =
 			conn.prepare("SELECT id, description, due_date FROM tasks ORDER BY id DESC LIMIT 1")?;
 
 		let task = stmt.query_one([], |row| {
 			Ok(Task::new(
-				row.get("id").expect("Could not get id"),
-				row.get("description").expect("Could not get description"),
-				row.get("due_date").expect("Could not get due_date"),
+				row.get("id")?,
+				row.get("description")?,
+				row.get("due_date")?,
 			))
 		})?;
 
@@ -70,8 +69,7 @@ impl Task {
 		conn: &Connection,
 		task: &Task,
 	) -> Result<(), Box<dyn std::error::Error>> {
-		conn.execute("DELETE FROM tasks WHERE id = ?1", params![task.id])
-			.expect("Could not delete task");
+		conn.execute("DELETE FROM tasks WHERE id = ?1", params![task.id])?;
 
 		Ok(())
 	}
