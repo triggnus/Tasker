@@ -128,6 +128,7 @@ impl Display for Task {
 				format!(
 					"due in {} days ({})",
 					due_in_days,
+					// SAFETY: if due_in_days() is Some, then due_date must also be Some, so we can safely unwrap
 					self.due_date.unwrap().format("%m-%d-%Y")
 				)
 			} else if due_in_days == 0 {
