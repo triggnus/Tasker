@@ -88,7 +88,12 @@ impl Task {
 
 				let d = due_in_days.parse::<u8>().ok();
 
-				Task::db_insert_task(conn, description.to_string(), d)
+				if d.is_some() {
+					Task::db_insert_task(conn, description.to_string(), d)
+				} else { 
+					Task::db_insert_task(conn, command, None)
+				}
+
 			}
 			_ => Err("Command not provided".into()),
 		}
