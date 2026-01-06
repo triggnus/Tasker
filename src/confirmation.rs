@@ -52,6 +52,9 @@ impl ConfirmationDialog {
 		self.tasks_to_delete.clone()
 	}
 
+	/// Send in the string of tasks that should be deleted from the db.<br/>
+	/// Input may be in the form "1 2 3" to delete tasks 1, 2 and 3. Or, may be in the form of "1-5" to delete tasks 1 through five. Or
+	/// any combination of the two (i.e. "1 2 5-9 11").
 	pub fn set_tasks_to_delete(&mut self, tasks_to_delete: String) {
 		// process range input
 		if tasks_to_delete.contains("-") {
@@ -76,15 +79,6 @@ impl ConfirmationDialog {
 					tasks.push(token.to_string());
 				}
 			}
-
-			/*let (start_token, end_token) = tasks_to_delete.split_once('-').unwrap();
-
-			let start = start_token.trim().parse::<i32>().unwrap();
-			let end = end_token.trim().parse::<i32>().unwrap();
-
-			self.tasks_to_delete = (start..=end).into_iter().fold(String::new(), |acc, x| {
-				format!("{} {}", acc, x)
-			}).trim().to_string();*/
 
 			self.tasks_to_delete = tasks
 				.iter()
