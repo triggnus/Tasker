@@ -1,4 +1,3 @@
-
 /// Confirmation Dialog data struct. Persists the data needed to delete task(s) across UI update cycles.
 pub struct ConfirmationDialog {
 	tasks_to_delete: String,
@@ -54,11 +53,79 @@ impl ConfirmationDialog {
 	}
 
 	pub fn set_tasks_to_delete(&mut self, tasks_to_delete: String) {
-		self.tasks_to_delete = tasks_to_delete;
+		// process range input
+		if tasks_to_delete.contains("-") {
+			let mut tasks: Vec<String> = Vec::new();
+
+			let clean_tasks = tasks_to_delete
+				.replace(" - ", "-")
+				.replace(" -", "-")
+				.replace("- ", "-");
+
+			for token in clean_tasks.split_whitespace() {
+				if token.contains("-") {
+					let (start_token, end_token) = token.split_once("-").unwrap();
+
+					let start = start_token.trim().parse::<u32>().unwrap();
+					let end = end_token.trim().parse::<u32>().unwrap();
+
+					(start..=end).into_iter().for_each(|id| {
+						tasks.push(id.to_string());
+					})
+				} else {
+					tasks.push(token.to_string());
+				}
+			}
+
+			/*let (start_token, end_token) = tasks_to_delete.split_once('-').unwrap();
+
+			let start = start_token.trim().parse::<i32>().unwrap();
+			let end = end_token.trim().parse::<i32>().unwrap();
+
+			self.tasks_to_delete = (start..=end).into_iter().fold(String::new(), |acc, x| {
+				format!("{} {}", acc, x)
+			}).trim().to_string();*/
+
+			self.tasks_to_delete = tasks
+				.iter()
+				.fold(String::new(), |acc, task| format!("{} {}", acc, task))
+				.trim()
+				.to_string()
+		} else {
+			self.tasks_to_delete = tasks_to_delete;
+		}
 	}
 
 	pub fn reset(&mut self) {
 		self.hide();
 		self.set_tasks_to_delete(String::new());
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_tasks_to_delete() {
+		let mut cd = ConfirmationDialog::new();
+
+		cd.set_tasks_to_delete(String::from("7-10"));
+		assert_eq!(cd.tasks_to_delete(), String::from("7 8 9 10"));
+
+		cd.set_tasks_to_delete(String::from("1 2 3"));
+		assert_eq!(cd.tasks_to_delete(), String::from("1 2 3"));
+
+		cd.set_tasks_to_delete(String::from("1"));
+		assert_eq!(cd.tasks_to_delete(), String::from("1"));
+
+		cd.set_tasks_to_delete(String::from("2 4-6"));
+		assert_eq!(cd.tasks_to_delete(), String::from("2 4 5 6"));
+
+		cd.set_tasks_to_delete(String::from("2 4- 6 9"));
+		assert_eq!(cd.tasks_to_delete(), String::from("2 4 5 6 9"));
+
+		cd.set_tasks_to_delete(String::from("2 4 - 6 9"));
+		assert_eq!(cd.tasks_to_delete(), String::from("2 4 5 6 9"));
 	}
 }
