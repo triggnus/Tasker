@@ -31,6 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY,
 			description TEXT NOT NULL,
+			notes TEXT NOT NULL,
 			due_date DATE NULL
 		)",
 		(),
@@ -38,11 +39,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	// Load the database in to a Vec<Task>
 	let mut tasks = conn
-		.prepare("SELECT id, description, due_date FROM tasks ORDER BY id ASC")?
+		.prepare("SELECT id, description, notes, due_date FROM tasks ORDER BY id ASC")?
 		.query_map([], |row| {
 			Ok(Task::new(
 				row.get("id")?,
 				row.get("description")?,
+				row.get("notes")?,
 				row.get("due_date")?,
 			))
 		})?

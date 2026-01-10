@@ -96,6 +96,7 @@ impl ConfirmationDialog {
 	}
 }
 
+// Test all the expected types of input for deleting task(s).
 #[cfg(test)]
 mod tests {
 	use super::*;
