@@ -85,9 +85,9 @@ impl Task {
 	}
 
 	// extract text between [ and ]
-	fn extract_notes(cmd: String) -> (String, String) {
-		let left = cmd.find('[');
-		let right = cmd.find(']');
+	fn extract_between(cmd: String, delim_a: char, delim_b: char) -> (String, String) {
+		let left = cmd.find(delim_a);
+		let right = cmd.rfind(delim_b);
 
 		if left.is_none() || right.is_none() {
 			return (cmd, String::new());
@@ -96,8 +96,8 @@ impl Task {
 		let notes = cmd[left.unwrap() + 1..right.unwrap()].to_string();
 		(
 			cmd.replace(&notes, "")
-				.replace("[", "")
-				.replace("]", "")
+				.replace(delim_a, "")
+				.replace(delim_b, "")
 				.trim()
 				.split_whitespace()
 				.collect::<Vec<&str>>()
@@ -110,26 +110,24 @@ impl Task {
 		conn: &Connection,
 		command: String,
 	) -> Result<Task, Box<dyn std::error::Error>> {
-		let (command, notes) = Task::extract_notes(command);
+		let (command, notes) = Task::extract_between(command, '[', ']');
+		let (command, desc) = Task::extract_between(command, '\'', '\'');
 
-		let sub_commands: Vec<&str> = command.rsplitn(2, ' ').collect();
+		let parts = command.rsplitn(2, ' ').collect::<Vec<&str>>();
 
-		match sub_commands.len() {
-			1 => Task::db_insert_task(conn, sub_commands[0].to_string(), notes, None),
-			2 => {
-				let due_in_days = sub_commands.get(0).unwrap_or(&"");
-				let description = sub_commands.get(1).ok_or("Could not find description")?;
-
-				let d = due_in_days.parse::<u8>().ok();
-
-				if d.is_some() {
-					Task::db_insert_task(conn, description.to_string(), notes, d)
-				} else {
-					Task::db_insert_task(conn, command, notes, None)
-				}
+		let description: String = if desc.is_empty() {
+			if parts.len() == 1 {
+				parts[0].to_string()
+			} else {
+				parts[1].to_string()
 			}
-			_ => Err("Command not provided".into()),
-		}
+		} else {
+			desc
+		};
+
+		let due_in_days = parts[0].parse::<u8>().ok();
+
+		Task::db_insert_task(conn, description, notes, due_in_days)
 	}
 
 	pub(crate) fn remove_tasks(
@@ -201,9 +199,18 @@ mod tests {
 
 	#[test]
 	fn test_extract_notes() {
-		let (c, notes) = Task::extract_notes("this is a [1,2,3] test".to_string());
+		let (c, notes) = Task::extract_between("this is a [1,2,3] test".to_string(), '[',']');
 
 		assert_eq!(c, "this is a test");
 		assert_eq!(notes, "1,2,3");
+
+		let (cmd, des) = Task::extract_between("'this 2' is a test".to_string(), '\'','\'');
+		assert_eq!(des, "this 2");
+		assert_eq!(cmd, "is a test");
+
+		let (cmd, d2) = Task::extract_between("'test 3' 3".to_string(), '\'', '\'');
+
+		println!("{cmd}");
+		println!("{d2}");
 	}
 }
