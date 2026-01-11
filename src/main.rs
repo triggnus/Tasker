@@ -7,7 +7,8 @@ use crossterm::{
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::layout::Position;
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Style, Stylize};
+use ratatui::text::Line;
 use ratatui::{
 	Terminal,
 	backend::CrosstermBackend,
@@ -61,9 +62,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// --- Application State ---
 	let mut input = String::new();
 	let mut show_task_popup = false;
+	let mut show_help = false;
 	let mut command = String::new();
 	let mut task_popup_command = String::new();
-	let mut confirm_dialog = ConfirmationDialog::new();
+	let mut delete_confirm_dialog = ConfirmationDialog::new();
 
 	// --- UI Main Loop ---
 	loop {
@@ -79,11 +81,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.split(f.area());
 
 			// Render Input Box
-			let input_widget = Paragraph::new(input.as_str()).block(
-				Block::default()
-					.borders(Borders::ALL)
-					.title(" Enter Command (Enter) "),
-			);
+			let input_widget = Paragraph::new(Line::from(vec!["# ".into(), input.clone().into()]))
+				.block(
+					Block::default()
+						.borders(Borders::ALL)
+						.title(Line::from(vec![" Enter Command (Enter)".into(), " ['help' for options] ".dark_gray().into()])),
+				);
 			f.render_widget(input_widget, chunks[0]);
 
 			// Render List
@@ -134,17 +137,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				f.set_cursor_position(cur_pos);
 
 				f.render_widget(popup, area);
+			} else if show_help {
+				let area = centered_rect(70, 60, size);
+				f.render_widget(Clear, area);
+
+				let popup = Popup::default()
+					.title(Line::from(" Tasker Usage ").white())
+					.content(HELP_STR);
+
+				f.render_widget(popup, area);
 			}
 
 			// --- Confirmation Dialog ---
-			if confirm_dialog.is_shown() {
+			if delete_confirm_dialog.is_shown() {
 				let area = centered_rect(40, 20, size);
 				f.render_widget(Clear, area);
 
 				let popup = Popup::default()
 					.style(Style::new().yellow())
-					.title(confirm_dialog.title())
-					.content(confirm_dialog.text())
+					.title(delete_confirm_dialog.title())
+					.content(delete_confirm_dialog.text())
 					.centered(true)
 					.title_style(Style::new().yellow().bold())
 					.border_style(Style::new().red().bold());
@@ -153,11 +165,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			}
 
 			// Draw the cursor in the right place
-			if !show_task_popup && !confirm_dialog.is_shown() {
+			if !show_task_popup && !delete_confirm_dialog.is_shown() {
 				f.set_cursor_position(Position::new(
 					// chunks[0] is the left most side of the input box
 					// Add the length of the input string + 1
-					chunks[0].x + input.len() as u16 + 1,
+					chunks[0].x + input.len() as u16 + 3,
 					// Drop the row by 1
 					chunks[0].y + 1,
 				));
@@ -169,14 +181,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			match key.code {
 				KeyCode::Esc => {
 					if show_task_popup {
+						// hide task popup
 						show_task_popup = false;
-					} else if confirm_dialog.is_shown() {
-						confirm_dialog.hide();
+					} else if delete_confirm_dialog.is_shown() {
+						// hide delete confirm dialog
+						delete_confirm_dialog.hide();
+					} else if show_help {
+						// hide help dialog
+						show_help = false;
 					} else {
+						// close the program
 						break;
 					}
 				}
 				KeyCode::Enter => {
+					if show_help {
+						// hide the help dialog
+						show_help = false;
+					}
+
 					if !input.is_empty() {
 						// NOTE: This is a bit convoluted, but it works. Need to rethink this.
 						match input.to_lowercase().as_str() {
@@ -188,6 +211,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 								show_task_popup = true;
 								command = "delete".to_string();
 							}
+							"h" | "help" => show_help = true,
 							"exit" | "quit" | "q" => break,
 							_ => {
 								// --- Inline command support ---
@@ -195,8 +219,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 									if let Some(sub_commands) = input.split_once(" ") {
 										let tasks_to_delete = sub_commands.1.to_string();
 
-										confirm_dialog.set_tasks_to_delete(tasks_to_delete.clone());
-										confirm_dialog.show();
+										delete_confirm_dialog.set_tasks_to_delete(tasks_to_delete.clone());
+										delete_confirm_dialog.show();
 									}
 								}
 
@@ -222,8 +246,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						} else if command.starts_with("delete")
 							|| command.chars().nth(1).unwrap() == 'd'
 						{
-							confirm_dialog.set_tasks_to_delete(task_popup_command.clone());
-							confirm_dialog.show();
+							delete_confirm_dialog.set_tasks_to_delete(task_popup_command.clone());
+							delete_confirm_dialog.show();
 						}
 
 						task_popup_command.clear();
@@ -233,19 +257,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				KeyCode::Char(c) => {
 					// c is every non-command character typed while the program is running.
 
-					// if the popup is rendered, then pipe the output to task_popup_command instead of input.
 					if show_task_popup {
+						// if the popup is rendered, then pipe the output to task_popup_command instead of input.
 						task_popup_command.push(c);
-					}
-					// else if the confirmation dialog is rendered, capture the 'y' char if pressed to confirm task deletion
-					else if confirm_dialog.is_shown() {
+					} else if delete_confirm_dialog.is_shown() {
+						// else if the confirmation dialog is rendered, capture the 'y' char if pressed to confirm task deletion
 						if c == 'y' {
-							Task::remove_tasks(&conn, &mut tasks, confirm_dialog.tasks_to_delete())?;
+							Task::remove_tasks(
+								&conn,
+								&mut tasks,
+								delete_confirm_dialog.tasks_to_delete(),
+							)?;
 						}
-						confirm_dialog.reset();
-					}
-					// Base case. Pipe input to the input variable.
-					else {
+						delete_confirm_dialog.reset();
+					} else if show_help {
+						// if the help window is being shown, do nothing.
+						();
+					} else {
+						// Base case. Pipe input to the input variable.
 						input.push(c);
 					}
 				}
@@ -276,3 +305,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	Ok(())
 }
+
+// text displayed when the help option is selected
+const HELP_STR: &str = "Options:
+    add | a         : Add a task
+    delete | d      : Delete a task
+    help | h        : Show this help
+    quit | q | exit : Quit Tasker
+
+Add a new task:
+    # add 'task name' 'due in days' [notes]
+    'due in days' and 'notes' are both optional.
+    example: # add Do Laundry 1 [Probably 3 loads]
+Delete a task:
+    # delete 'task id'
+    'task id' is the number(s) and/or range of numbers (i.e. 3-8)
+    example: # delete 1 4 6-9 12";

@@ -35,7 +35,7 @@ impl Widget for Popup<'_> {
 			.border_style(self.border_style);
 
 		Paragraph::new(self.content)
-			.wrap(Wrap { trim: true })
+			.wrap(Wrap { trim: false })
 			.style(self.style)
 			.block(block)
 			.alignment(if self.centered {
