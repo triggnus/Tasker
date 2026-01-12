@@ -101,17 +101,26 @@ impl Task {
 			return (cmd, String::new());
 		}
 
-		let notes = cmd[left.unwrap() + 1..right.unwrap()].to_string();
-		(
-			cmd.replace(&notes, "")
-				.replace(delim_a, "")
-				.replace(delim_b, "")
-				.trim()
-				.split_whitespace()
-				.collect::<Vec<&str>>()
-				.join(" "),
-			notes,
-		)
+		if let Some(left) = left
+			&& let Some(right) = right
+			&& left < right
+		{
+			let extract = cmd[left + 1..right].to_string();
+
+			// return the separated values
+			(
+				cmd.replace(&extract, "")
+					.replace(delim_a, "")
+					.replace(delim_b, "")
+					.trim()
+					.split_whitespace()
+					.collect::<Vec<&str>>()
+					.join(" "),
+				extract,
+			)
+		} else {
+			(cmd, String::new())
+		}
 	}
 
 	pub(crate) fn insert_task(
