@@ -84,8 +84,16 @@ impl Task {
 		Ok(())
 	}
 
-	// extract text between delimiters
-	fn extract_between(cmd: String, delim_a: char, delim_b: char) -> (String, String) {
+	/// Extracts the text placed between the given delimiters, and removes excess white space left behind.
+	///
+	/// Example:
+	/// ```
+	/// let (remainder, extracted) = extract_between("some [other] text", '[', ']');
+	/// assert_eq!(String::from("some text"), remainder);
+	/// assert_eq!(String::from("other"), extracted);
+	/// ```
+	fn extract_between<T: ToString>(cmd: T, delim_a: char, delim_b: char) -> (String, String) {
+		let cmd = cmd.to_string();
 		let left = cmd.find(delim_a);
 		let right = cmd.rfind(delim_b);
 
