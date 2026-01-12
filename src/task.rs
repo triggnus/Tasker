@@ -203,7 +203,7 @@ impl Display for Task {
 			(false, false) => format!(" {} {}", due, notes),
 			(false, true) => format!(" {}", due),
 			(true, false) => format!(" {}", notes),
-			(true, true) => String::new()
+			(true, true) => String::new(),
 		};
 
 		write!(fmt, "[{}] '{}'{}", self.id, self.description, tail)
