@@ -84,7 +84,7 @@ impl Task {
 		Ok(())
 	}
 
-	// extract text between [ and ]
+	// extract text between delimiters
 	fn extract_between(cmd: String, delim_a: char, delim_b: char) -> (String, String) {
 		let left = cmd.find(delim_a);
 		let right = cmd.rfind(delim_b);
