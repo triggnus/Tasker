@@ -215,19 +215,29 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn test_extract_notes() {
-		let (c, notes) = Task::extract_between("this is a [1,2,3] test".to_string(), '[',']');
+	fn test_extract_between() {
+		let (c1, d1) = Task::extract_between("this is a [1,2,3] test".to_string(), '[', ']');
 
-		assert_eq!(c, "this is a test");
-		assert_eq!(notes, "1,2,3");
+		assert_eq!(c1, "this is a test");
+		assert_eq!(d1, "1,2,3");
 
-		let (cmd, des) = Task::extract_between("'this 2' is a test".to_string(), '\'','\'');
-		assert_eq!(des, "this 2");
-		assert_eq!(cmd, "is a test");
+		let (c2, d2) = Task::extract_between("'this 2' is a test".to_string(), '\'', '\'');
+		assert_eq!(c2, "is a test");
+		assert_eq!(d2, "this 2");
 
-		let (cmd, d2) = Task::extract_between("'test 3' 3".to_string(), '\'', '\'');
+		let (c3, d3) = Task::extract_between("'test 3' 3", '\'', '\'');
 
-		println!("{cmd}");
-		println!("{d2}");
+		assert_eq!(c3, "3");
+		assert_eq!(d3, "test 3");
+
+		// should fail and return original string and an empty string
+		let (c4, d4) = Task::extract_between("test 4", '\'', '\'');
+		assert_eq!(c4, "test 4");
+		assert_eq!(d4, "");
+
+		// should fail and return original string and an empty string
+		let (c5, d5) = Task::extract_between("test [5", '[', ']');
+		assert_eq!(c5, "test [5");
+		assert_eq!(d5, "");
 	}
 }
