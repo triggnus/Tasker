@@ -3,6 +3,7 @@
 use chrono::{Days, Local, NaiveDateTime};
 use rusqlite::{Connection, params};
 use std::fmt::Display;
+use crate::command::extract_between;
 
 pub struct Task {
 	id: u32,
@@ -84,55 +85,19 @@ impl Task {
 		Ok(())
 	}
 
-	/// Extracts the text placed between the given delimiters, and removes excess white space left behind.
-	///
-	/// Example:
-	/// ```
-	/// let (remainder, extracted) = extract_between("some [other] text", '[', ']');
-	/// assert_eq!(String::from("some text"), remainder);
-	/// assert_eq!(String::from("other"), extracted);
-	/// ```
-	fn extract_between<T: ToString>(cmd: T, delim_a: char, delim_b: char) -> (String, String) {
-		let cmd = cmd.to_string();
-		let left = cmd.find(delim_a);
-		let right = cmd.rfind(delim_b);
-
-		if left.is_none() || right.is_none() {
-			return (cmd, String::new());
-		}
-
-		if let Some(left) = left
-			&& let Some(right) = right
-			&& left < right
-		{
-			let extract = cmd[left + 1..right].to_string();
-
-			// return the separated values
-			(
-				cmd.replace(&extract, "")
-					.replace(delim_a, "")
-					.replace(delim_b, "")
-					.trim()
-					.split_whitespace()
-					.collect::<Vec<&str>>()
-					.join(" "),
-				extract,
-			)
-		} else {
-			(cmd, String::new())
-		}
-	}
-
 	pub(crate) fn insert_task(
 		conn: &Connection,
 		command: String,
 	) -> Result<Task, Box<dyn std::error::Error>> {
-		let (command, notes) = Task::extract_between(command, '[', ']');
-		let (command, desc) = Task::extract_between(command, '\'', '\'');
+		let (command, notes) = extract_between(command, '[', ']');
+		let (mut command, mut desc) = extract_between(command, '\'', '\'');
+		if desc.is_empty() {
+			(command, desc) = extract_between(command, '"', '"')
+		}
 
 		let parts = command.rsplitn(2, ' ').collect::<Vec<&str>>();
 
-		let description: String = if desc.is_empty() {
+		let description = if desc.is_empty() {
 			if parts.len() == 1 {
 				parts[0].to_string()
 			} else {
@@ -207,37 +172,5 @@ impl Display for Task {
 		};
 
 		write!(fmt, "[{}] '{}'{}", self.id, self.description, tail)
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_extract_between() {
-		let (c1, d1) = Task::extract_between("this is a [1,2,3] test".to_string(), '[', ']');
-
-		assert_eq!(c1, "this is a test");
-		assert_eq!(d1, "1,2,3");
-
-		let (c2, d2) = Task::extract_between("'this 2' is a test".to_string(), '\'', '\'');
-		assert_eq!(c2, "is a test");
-		assert_eq!(d2, "this 2");
-
-		let (c3, d3) = Task::extract_between("'test 3' 3", '\'', '\'');
-
-		assert_eq!(c3, "3");
-		assert_eq!(d3, "test 3");
-
-		// should fail and return original string and an empty string
-		let (c4, d4) = Task::extract_between("test 4", '\'', '\'');
-		assert_eq!(c4, "test 4");
-		assert_eq!(d4, "");
-
-		// should fail and return original string and an empty string
-		let (c5, d5) = Task::extract_between("test [5", '[', ']');
-		assert_eq!(c5, "test [5");
-		assert_eq!(d5, "");
 	}
 }
