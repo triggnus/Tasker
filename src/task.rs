@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
+use crate::command::InsertCommand;
 use chrono::{Days, Local, NaiveDateTime};
 use rusqlite::{Connection, params};
 use std::fmt::Display;
-use crate::command::extract_between;
 
 pub struct Task {
 	id: u32,
@@ -85,31 +85,20 @@ impl Task {
 		Ok(())
 	}
 
+	// noinspection Duplicates
 	pub(crate) fn insert_task(
 		conn: &Connection,
 		command: String,
 	) -> Result<Task, Box<dyn std::error::Error>> {
-		let (command, notes) = extract_between(command, '[', ']');
-		let (mut command, mut desc) = extract_between(command, '\'', '\'');
-		if desc.is_empty() {
-			(command, desc) = extract_between(command, '"', '"')
-		}
+		let parsed_command = InsertCommand::parse(&command)?;
+		let notes = parsed_command.notes.unwrap_or(String::new());
 
-		let parts = command.rsplitn(2, ' ').collect::<Vec<&str>>();
-
-		let description = if desc.is_empty() {
-			if parts.len() == 1 {
-				parts[0].to_string()
-			} else {
-				parts[1].to_string()
-			}
-		} else {
-			desc
-		};
-
-		let due_in_days = parts[0].parse::<u8>().ok();
-
-		Task::db_insert_task(conn, description, notes, due_in_days)
+		Task::db_insert_task(
+			conn,
+			parsed_command.description,
+			notes,
+			parsed_command.due_in_days,
+		)
 	}
 
 	pub(crate) fn remove_tasks(
