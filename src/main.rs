@@ -22,6 +22,7 @@ mod confirmation;
 mod popup;
 mod task;
 mod command;
+mod char_to_vec;
 
 //noinspection DuplicatedCode
 fn main() -> Result<(), Box<dyn std::error::Error>> {
