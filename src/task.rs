@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::command::InsertCommand;
+use crate::insert_command::InsertCommand;
 use chrono::{Days, Local, NaiveDateTime};
 use rusqlite::{Connection, params};
 use std::fmt::Display;

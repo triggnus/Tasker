@@ -2,6 +2,7 @@
 
 use crate::char_to_vec::CharToVec;
 
+/// Data struct for an insert command for tasks.
 pub struct InsertCommand {
 	pub description: String,
 	pub due_in_days: Option<u8>,
@@ -9,10 +10,19 @@ pub struct InsertCommand {
 }
 
 impl InsertCommand {
-	/// Parses an input string into a corresponding set of commands.
-	// noinspection Duplicates
-	pub fn parse<T: ToString>(command: T) -> Result<Self, Box<dyn std::error::Error>> {
+	/// Parses an input string into a corresponding set of commands. This is done in a very loose fashion; as long as there is one 
+	/// character of input, that will be taken to be the task name. All other commands are optional and anything that doesn't meet the 
+	/// requirements is silently dropped and unused.
+	pub fn parse(command: impl ToString) -> Result<Self, Box<dyn std::error::Error>> {
+		// NOTE: This is pretty dirty, but it works. I would like to see this implemented in a more modular fashion. Perhaps add some 
+		// error handling for invalid inputs. Currently, invalid input is simply dropped.
+
 		let mut command = command.to_string();
+		
+		// technically, the only failure condition is an empty command
+		if command.is_empty() {
+			return Err("Command is empty!".into());
+		}
 
 		let mut notes = String::new();
 
@@ -68,17 +78,31 @@ impl InsertCommand {
 	}
 }
 
+/// A ParseResult contains an unparsed string, the extracted text and the remaining text.
 pub struct ParseResult {
 	pub initial: String,
 	pub extracted: String,
 	pub remaining: String,
 }
 
+/// Extracts a string from within another string. The internal string is selected by the given delimiter(s).
+///
+/// Example:
+/// ```
+/// use crate::char_to_vec::CharToVec;
+///
+/// let text = "This is a {test} of parse_by_delimiter()";
+/// let result = parse_by_delimiter(text, ['{', '}']);
+///
+/// assert_eq!(String::from("test"), result.extracted);
+/// assert_eq!(String::from("This is a of parse_by_delimiter()"), result.remaining);
+/// ```
 pub(crate) fn parse_by_delimiter(command: impl ToString, delimiter: impl CharToVec) -> Result<ParseResult, Box<dyn std::error::Error>> {
 	let command = command.to_string();
 
-	if !command.contains(delimiter.to_vec().as_slice()) {
-		return Err("Delimiter Not Found!".into());
+	// if any of the given delimiter(s) are not found, return an Err()
+	if !delimiter.to_vec().iter().all(|c| command.contains(*c) ) {
+		return Err(format!("Delimiter '{:?}' not found in command text!", delimiter.to_vec()).into());
 	}
 
 	let d_vec = delimiter.to_vec();
@@ -142,6 +166,12 @@ mod tests {
 		let b4 = a4.unwrap();
 		assert_eq!(b4.extracted, String::from("1,2,3"));
 		assert_eq!(b4.remaining, String::from("this is a test"));
+
+		let should_fail1 = parse_by_delimiter("this test [fails", ['[', ']']);
+		assert!(should_fail1.is_err());
+
+		let should_fail2 = parse_by_delimiter("this test fails", '\'');
+		assert!(should_fail2.is_err());
 	}
 
 	#[test]
@@ -165,5 +195,8 @@ mod tests {
 		assert_eq!(c4.description, "test 4");
 		assert_eq!(c4.due_in_days, Some(5));
 		assert_eq!(c4.notes, Some(String::from("notes")));
+		
+		let should_fail1 = InsertCommand::parse("");
+		assert!(should_fail1.is_err());
 	}
 }

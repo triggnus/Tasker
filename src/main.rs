@@ -1,3 +1,16 @@
+//! # Tasker
+//! Interactive command line tool for creating and tracking tasks. Tasks have a name, an optional due date and optional notes.
+//!
+//! Author: Rob Teeple <somethingobscure@gmail.com>
+//!
+//! This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as
+//! published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+//!
+//! This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+//! of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more de
+//!
+//! You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::confirmation::ConfirmationDialog;
 use crate::popup::{Popup, centered_rect};
 use crate::task::Task;
@@ -19,12 +32,11 @@ use rusqlite::Connection;
 use std::io;
 
 mod char_to_vec;
-mod command;
+mod insert_command;
 mod confirmation;
 mod popup;
 mod task;
 
-//noinspection DuplicatedCode
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// --- DB Initialization ---
 	let conn = Connection::open("task_db.sqlite")?;
