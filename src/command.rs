@@ -12,8 +12,6 @@ impl InsertCommand {
 	/// Parses an input string into a corresponding set of commands.
 	// noinspection Duplicates
 	pub fn parse<T: ToString>(command: T) -> Result<Self, Box<dyn std::error::Error>> {
-		let command = command.to_string();
-
 		let mut command = command.to_string();
 
 		let mut notes = String::new();
@@ -110,9 +108,7 @@ pub(crate) fn parse_by_delimiter(command: impl ToString, delimiter: impl CharToV
 		initial: command.to_owned(),
 		extracted: extract.to_owned(),
 		remaining: command.replace(&extract, "")
-		.replace(d_vec[0], "")
-		.replace(delim_b, "")
-		.trim()
+		.replace([d_vec[0], delim_b], "")
 		.split_whitespace()
 		.collect::<Vec<&str>>()
 		.join(" "),
@@ -150,22 +146,22 @@ mod tests {
 
 	#[test]
 	fn test_parse_command() {
-		let c1 = InsertCommand::parse("a test").unwrap();
+		let c1 = InsertCommand::parse("test").unwrap();
 		assert_eq!(c1.description, "test");
 		assert_eq!(c1.due_in_days, None);
 		assert_eq!(c1.notes, None);
 
-		let c2 = InsertCommand::parse("a 'test 2'").unwrap();
+		let c2 = InsertCommand::parse("'test 2'").unwrap();
 		assert_eq!(c2.description, "test 2");
 		assert_eq!(c2.due_in_days, None);
 		assert_eq!(c2.notes, None);
 
-		let c3 = InsertCommand::parse("a test 3").unwrap();
+		let c3 = InsertCommand::parse("test 3").unwrap();
 		assert_eq!(c3.description, "test");
 		assert_eq!(c3.due_in_days, Some(3));
 		assert_eq!(c3.notes, None);
 
-		let c4 = InsertCommand::parse("a 'test 4' 5 [notes]").unwrap();
+		let c4 = InsertCommand::parse("'test 4' 5 [notes]").unwrap();
 		assert_eq!(c4.description, "test 4");
 		assert_eq!(c4.due_in_days, Some(5));
 		assert_eq!(c4.notes, Some(String::from("notes")));

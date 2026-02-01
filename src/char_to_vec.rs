@@ -5,7 +5,7 @@ pub trait CharToVec {
 
 impl CharToVec for char {
 	fn to_vec(&self) -> Vec<char> {
-		vec![self.clone()]
+		vec![*self]
 	}
 }
 

@@ -72,7 +72,7 @@ impl ConfirmationDialog {
 					let start = start_token.trim().parse::<u32>().unwrap();
 					let end = end_token.trim().parse::<u32>().unwrap();
 
-					(start..=end).into_iter().for_each(|id| {
+					(start..=end).for_each(|id| {
 						tasks.push(id.to_string());
 					})
 				} else {

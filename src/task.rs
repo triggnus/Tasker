@@ -8,7 +8,7 @@ use std::fmt::Display;
 pub struct Task {
 	id: u32,
 	description: String,
-	notes: String,
+	notes: Option<String>,
 	due_date: Option<NaiveDateTime>,
 }
 
@@ -16,7 +16,7 @@ impl Task {
 	pub fn new(
 		id: u32,
 		description: String,
-		notes: String,
+		notes: Option<String>,
 		due_date: Option<NaiveDateTime>,
 	) -> Self {
 		Self {
@@ -34,20 +34,16 @@ impl Task {
 	pub(crate) fn due_in_days(&self) -> Option<i32> {
 		let now = Local::now().date_naive();
 
-		let Some(due) = self.due_date else {
-			return None;
-		};
+		let due = self.due_date?;
 
 		Some(due.date().to_epoch_days() - now.to_epoch_days())
 	}
 
 	pub(crate) fn db_insert_task(
 		conn: &Connection,
-		description: String,
-		notes: String,
-		due_in_days: Option<u8>,
+		insert_command: InsertCommand,
 	) -> Result<Task, Box<dyn std::error::Error>> {
-		let due_date = if let Some(due_days) = due_in_days {
+		let due_date = if let Some(due_days) = insert_command.due_in_days {
 			Local::now()
 				.naive_local()
 				.checked_add_days(Days::new(due_days as u64))
@@ -57,7 +53,7 @@ impl Task {
 
 		conn.execute(
 			"INSERT INTO tasks (description, notes, due_date) VALUES (?1, ?2, ?3)",
-			params![description, notes, due_date],
+			params![insert_command.description, insert_command.notes, due_date],
 		)?;
 
 		let mut stmt = conn.prepare(
@@ -91,13 +87,11 @@ impl Task {
 		command: String,
 	) -> Result<Task, Box<dyn std::error::Error>> {
 		let parsed_command = InsertCommand::parse(&command)?;
-		let notes = parsed_command.notes.unwrap_or(String::new());
+		//let notes = parsed_command.notes.unwrap_or(String::new());
 
 		Task::db_insert_task(
 			conn,
-			parsed_command.description,
-			notes,
-			parsed_command.due_in_days,
+			parsed_command,
 		)
 	}
 
@@ -112,14 +106,14 @@ impl Task {
 			if sub_command == "all" {
 				// delete all tasks
 				for task in tasks.iter() {
-					Task::db_remove_task(&conn, task)?;
+					Task::db_remove_task(conn, task)?;
 				}
 				tasks.clear();
 				break;
 			} else if let Ok(num) = sub_command.parse::<u32>() {
 				// delete task by number
 				if let Some(position) = tasks.iter().position(|p| p.id() == num) {
-					Task::db_remove_task(&conn, &tasks.remove(position))?
+					Task::db_remove_task(conn, &tasks.remove(position))?
 				}
 			}
 		}
@@ -147,8 +141,8 @@ impl Display for Task {
 			String::new()
 		};
 
-		let notes = if !self.notes.is_empty() {
-			format!("Notes: {}", self.notes)
+		let notes = if let Some(notes) = &self.notes {
+			format!("Notes: {}", notes)
 		} else {
 			String::new()
 		};

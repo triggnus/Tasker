@@ -18,11 +18,11 @@ use ratatui::{
 use rusqlite::Connection;
 use std::io;
 
+mod char_to_vec;
+mod command;
 mod confirmation;
 mod popup;
 mod task;
-mod command;
-mod char_to_vec;
 
 //noinspection DuplicatedCode
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY,
 			description TEXT NOT NULL,
-			notes TEXT NOT NULL,
+			notes TEXT NULL,
 			due_date DATE NULL
 		)",
 		(),
@@ -87,7 +87,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.block(
 					Block::default()
 						.borders(Borders::ALL)
-						.title(Line::from(vec![" Enter Command (Enter)".into(), " ['help' for options] ".dark_gray().into()])),
+						.title(Line::from(vec![
+							" Enter Command (Enter)".into(),
+							" ['help' for options] ".dark_gray(),
+						])),
 				);
 			f.render_widget(input_widget, chunks[0]);
 
@@ -217,22 +220,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 							"exit" | "quit" | "q" => break,
 							_ => {
 								// --- Inline command support ---
-								if input.starts_with("d") {
-									if let Some(sub_commands) = input.split_once(" ") {
-										let tasks_to_delete = sub_commands.1.to_string();
+								if input.starts_with("d")
+									&& let Some(sub_commands) = input.split_once(" ")
+								{
+									let tasks_to_delete = sub_commands.1.to_string();
 
-										delete_confirm_dialog.set_tasks_to_delete(tasks_to_delete.clone());
-										delete_confirm_dialog.show();
-									}
+									delete_confirm_dialog
+										.set_tasks_to_delete(tasks_to_delete.clone());
+									delete_confirm_dialog.show();
 								}
 
-								if input.starts_with("a") {
-									if let Some(sub_commands) = input.split_once(" ") {
-										tasks.push(Task::insert_task(
-											&conn,
-											sub_commands.1.to_string(),
-										)?);
-									}
+								if input.starts_with("a")
+									&& let Some(sub_commands) = input.split_once(" ")
+								{
+									tasks.push(Task::insert_task(
+										&conn,
+										sub_commands.1.to_string(),
+									)?);
 								}
 							}
 						}
@@ -274,7 +278,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						delete_confirm_dialog.reset();
 					} else if show_help {
 						// if the help window is being shown, do nothing.
-						();
+						continue;
 					} else {
 						// Base case. Pipe input to the input variable.
 						input.push(c);
@@ -310,15 +314,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // text displayed when the help option is selected
 const HELP_STR: &str = "Options:
-    add | a         : Add a task
-    delete | d      : Delete a task
-    help | h        : Show this help
-    quit | q | exit : Quit Tasker
+    add    | a        : Add a task
+    delete | d        : Delete a task
+    help   | h        : Show this help
+    quit   | q | exit : Quit Tasker
 
 Add a new task:
     # add 'task name' 'due in days' [notes]
-    'due in days' and 'notes' are both optional.
-    example: # add Do Laundry 1 [Probably 3 loads]
+    'due in days' and 'notes' are both optional
+    'task name' must be in single or double quotes if more than one word
+    example: # add 'Do Laundry' 1 [Probably 3 loads]
 Delete a task:
     # delete 'task id'
     'task id' is the number(s) and/or range of numbers (i.e. 3-8)
