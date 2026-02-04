@@ -36,6 +36,7 @@ mod insert_command;
 mod confirmation;
 mod popup;
 mod task;
+mod delimiter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// --- DB Initialization ---
